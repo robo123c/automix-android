@@ -10,3 +10,4 @@
 - [x] Validate the project, inspect the preview, and prepare a checkpoint for delivery
 - [x] Create a private GitHub repository and push the AutoMix Android project
 - [x] Add GitHub Actions quality checks and Android build artifact workflow
+- [x] Add Gradle caching to the GitHub Actions Android build
