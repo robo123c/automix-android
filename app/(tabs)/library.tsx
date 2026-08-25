@@ -29,7 +29,7 @@ export default function LibraryScreen() {
         data={library}
         keyExtractor={(track) => track.id}
         renderItem={({ item }) => <LibraryRow track={item} onPress={() => void playTrack(item.id)} />}
-        ListEmptyComponent={<View style={styles.empty}><MaterialIcons name="audio-file" color="#747783" size={31} /><Text style={styles.emptyTitle}>No local tracks yet</Text><Text style={styles.emptyCopy}>Choose audio files from your phone. They stay in the app’s local library for playback and mix planning.</Text></View>}
+        ListEmptyComponent={<View style={styles.empty}><MaterialIcons name="audio-file" color="#747783" size={31} /><Text style={styles.emptyTitle}>No local tracks yet</Text><Text style={styles.emptyCopy}>Choose audio files from your phone. They stay in the app’s local library for playback and mix planning.</Text><Pressable disabled={importState === "importing"} onPress={() => void importAudio()} style={({ pressed }) => [styles.emptyImportButton, importState === "importing" && styles.disabled, pressed && styles.pressed]}><MaterialIcons name="library-add" color="#0A0B10" size={20} /><Text style={styles.emptyImportText}>{importState === "importing" ? "Opening files…" : "Add music"}</Text></Pressable></View>}
         contentContainerStyle={library.length === 0 ? styles.emptyList : styles.list}
         showsVerticalScrollIndicator={false}
       />
@@ -73,6 +73,8 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", justifyContent: "center", flex: 1, paddingBottom: 115, paddingHorizontal: 25 },
   emptyTitle: { color: "#F6F7F2", marginTop: 13, fontSize: 18, lineHeight: 24, fontWeight: "800" },
   emptyCopy: { color: "#9B9EA8", marginTop: 6, textAlign: "center", fontSize: 13, lineHeight: 19 },
+  emptyImportButton: { marginTop: 21, minHeight: 52, paddingHorizontal: 20, borderRadius: 17, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#C7FF3D" },
+  emptyImportText: { color: "#0A0B10", fontSize: 14, lineHeight: 19, fontWeight: "900" },
   issue: { color: "#FFC74A", fontSize: 12, lineHeight: 17, textAlign: "center", paddingVertical: 8 },
   notice: { color: "#C7FF3D", fontSize: 12, lineHeight: 17, textAlign: "center", paddingVertical: 8 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },

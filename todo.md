@@ -17,3 +17,4 @@
 - [x] Install obra/superpowers and apply its debugging guidance to the Android startup failure
 - [x] Document how local song import and playback are implemented in AutoMix
 - [x] Implement and validate robust local song import and playback in AutoMix
+- [x] Add a persistent empty-state Library import control and rebuild the Android APK
