@@ -19,3 +19,5 @@
 - [x] Implement and validate robust local song import and playback in AutoMix
 - [x] Add a persistent empty-state Library import control and rebuild the Android APK
 - [x] Replace per-push APK builds with conditional nightly Android releases
+- [x] Run and verify the initial conditional nightly Android release
+- [x] Document the policy to batch minor fixes and reserve manual APK builds for urgent requests

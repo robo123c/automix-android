@@ -73,12 +73,12 @@ jobs:
             baseline="$(git rev-list -n 1 "${marker}")"
             echo "baseline=${baseline}" >> "$GITHUB_OUTPUT"
 
-            if git diff --quiet "${baseline}" "${GITHUB_SHA}"; then
+            if git diff --quiet "${baseline}" "${GITHUB_SHA}" -- . ':(exclude,glob)*.md' ':(exclude,glob)**/*.md' ':(exclude,glob).github/**'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
-              echo "No source changes since ${marker} (${baseline}); skipping APK build and release."
+              echo "No APK-affecting changes since ${marker} (${baseline}); skipping APK build and release."
             else
               echo "changed=true" >> "$GITHUB_OUTPUT"
-              echo "Source changes detected since ${marker} (${baseline}); a nightly APK release is required."
+              echo "APK-affecting changes detected since ${marker} (${baseline}); a nightly APK release is required."
             fi
           else
             echo "baseline=first-nightly-release" >> "$GITHUB_OUTPUT"
