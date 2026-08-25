@@ -1,7 +1,10 @@
-name: Android build
+name: Android quality and nightly release
 
 on:
   workflow_dispatch:
+  schedule:
+    # 02:30 Asia/Kolkata (21:00 UTC on the preceding day).
+    - cron: "0 21 * * *"
   push:
     branches: [main]
   pull_request:
@@ -45,16 +48,58 @@ jobs:
       - name: Test transition logic
         run: pnpm test
 
-  build-apk:
-    name: Build Android APK
+  release-gate:
+    name: Check nightly release need
     needs: quality
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+      baseline: ${{ steps.changes.outputs.baseline }}
+    steps:
+      - name: Check out source and previous release marker
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine whether an APK release is needed
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker="android-nightly-latest"
+
+          if git rev-parse -q --verify "refs/tags/${marker}^{commit}" >/dev/null; then
+            baseline="$(git rev-list -n 1 "${marker}")"
+            echo "baseline=${baseline}" >> "$GITHUB_OUTPUT"
+
+            if git diff --quiet "${baseline}" "${GITHUB_SHA}"; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "No source changes since ${marker} (${baseline}); skipping APK build and release."
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "Source changes detected since ${marker} (${baseline}); a nightly APK release is required."
+            fi
+          else
+            echo "baseline=first-nightly-release" >> "$GITHUB_OUTPUT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "No prior nightly release marker exists; creating the first nightly APK release."
+          fi
+
+  build-apk:
+    name: Build and release Android APK
+    needs: release-gate
+    if: needs.release-gate.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     env:
       CI: true
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -89,10 +134,42 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon --build-cache
 
-      - name: Upload release APK
+      - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: AutoMix-android-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish nightly GitHub release
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_date="$(date -u +'%Y-%m-%d')"
+          release_tag="android-nightly-${release_date}-${GITHUB_SHA::7}"
+          release_title="AutoMix nightly — ${release_date}"
+          apk_path="android/app/build/outputs/apk/release/app-release.apk"
+
+          gh release create "${release_tag}" "${apk_path}#AutoMix-android-release.apk" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "${release_title}" \
+            --notes "Nightly standalone Android release built from ${GITHUB_SHA}."
+
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Record successful nightly release baseline
+        env:
+          RELEASE_TAG: ${{ steps.publish.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --force --annotate android-nightly-latest "${GITHUB_SHA}" \
+            --message "Latest successful nightly release: ${RELEASE_TAG}"
+          git push origin "refs/tags/android-nightly-latest" --force
