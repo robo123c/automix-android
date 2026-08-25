@@ -92,5 +92,13 @@
     "typescript": "~5.9.3",
     "vitest": "^2.1.9"
   },
+  "expo": {
+    "install": {
+      "exclude": [
+        "@react-navigation/bottom-tabs",
+        "@react-navigation/native"
+      ]
+    }
+  },
   "packageManager": "pnpm@9.12.0"
 }

@@ -25,12 +25,12 @@ export default function QueueScreen() {
   const { library, currentIndex, activePlan, nextTrack, playTrack, removeTrack, clearLibrary } = useMix();
   return (
     <ScreenContainer containerClassName="bg-background" className="px-5" edges={["top", "left", "right"]}>
-      <View style={styles.header}><View><Text style={styles.title}>Queue</Text><Text style={styles.subtitle}>TRANSITION-AWARE ORDER</Text></View>{library.length > 0 ? <Pressable onPress={clearLibrary} style={({ pressed }) => [styles.clear, pressed && styles.pressed]}><Text style={styles.clearText}>Clear</Text></Pressable> : null}</View>
+      <View style={styles.header}><View><Text style={styles.title}>Queue</Text><Text style={styles.subtitle}>TRANSITION-AWARE ORDER</Text></View>{library.length > 0 ? <Pressable onPress={() => void clearLibrary()} style={({ pressed }) => [styles.clear, pressed && styles.pressed]}><Text style={styles.clearText}>Clear</Text></Pressable> : null}</View>
       <TransitionCard plan={activePlan} nextTitle={nextTrack?.title} />
       <FlatList
         data={library}
         keyExtractor={(track) => track.id}
-        renderItem={({ item, index }) => <QueueRow track={item} index={index} isCurrent={index === currentIndex} onPlay={() => void playTrack(item.id)} onRemove={() => removeTrack(item.id)} />}
+        renderItem={({ item, index }) => <QueueRow track={item} index={index} isCurrent={index === currentIndex} onPlay={() => void playTrack(item.id)} onRemove={() => void removeTrack(item.id)} />}
         ListEmptyComponent={<View style={styles.empty}><MaterialIcons name="queue-music" color="#747783" size={31} /><Text style={styles.emptyTitle}>Your queue is empty</Text><Text style={styles.emptyCopy}>Import local tracks in Library, then AutoMix will preview its next transition here.</Text></View>}
         contentContainerStyle={library.length === 0 ? styles.emptyList : styles.list}
         showsVerticalScrollIndicator={false}

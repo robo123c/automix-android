@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
-import { Directory, File, Paths } from "expo-file-system";
+import { Directory, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import {
   createContext,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/mix-settings";
 
 type ManagedPlayer = ReturnType<typeof createAudioPlayer>;
+type PlayerSubscription = { remove: () => void };
 
 export type LocalTrack = {
   id: string;
@@ -72,8 +74,8 @@ type MixContextValue = {
   playPrevious: () => Promise<void>;
   seekTo: (seconds: number) => Promise<void>;
   updateSettings: (patch: Partial<MixSettings>) => void;
-  removeTrack: (id: string) => void;
-  clearLibrary: () => void;
+  removeTrack: (id: string) => Promise<void>;
+  clearLibrary: () => Promise<void>;
 };
 
 const STORAGE_KEY = "automix.library.v1";
@@ -82,6 +84,15 @@ const MixContext = createContext<MixContextValue | null>(null);
 
 function nextIndexFor(index: number, library: LocalTrack[]) {
   return index >= 0 && index + 1 < library.length ? index + 1 : -1;
+}
+
+function managedLibraryUri() {
+  const uri = new Directory(Paths.document, "automix-library").uri;
+  return uri.endsWith("/") ? uri : `${uri}/`;
+}
+
+function isManagedLibraryUri(uri: string) {
+  return uri.startsWith(managedLibraryUri());
 }
 
 export function MixProvider({ children }: { children: React.ReactNode }) {
@@ -100,7 +111,9 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   const currentPlayerRef = useRef<ManagedPlayer | null>(null);
-  const sampleSubscriptionRef = useRef<{ remove: () => void } | null>(null);
+  const sampleSubscriptionsRef = useRef(new Map<ManagedPlayer, PlayerSubscription>());
+  const transitionPlayerRef = useRef<ManagedPlayer | null>(null);
+  const transitionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mixingRef = useRef(false);
   const currentIndexRef = useRef(-1);
   const libraryRef = useRef<LocalTrack[]>([]);
@@ -159,13 +172,30 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
   }, [isReady, settings]);
 
   const releasePlayer = useCallback(() => {
-    sampleSubscriptionRef.current?.remove();
-    sampleSubscriptionRef.current = null;
-    if (currentPlayerRef.current) {
-      currentPlayerRef.current.pause();
-      currentPlayerRef.current.remove();
-      currentPlayerRef.current = null;
+    if (transitionTimerRef.current) {
+      clearInterval(transitionTimerRef.current);
+      transitionTimerRef.current = null;
     }
+    mixingRef.current = false;
+
+    const players = new Set([currentPlayerRef.current, transitionPlayerRef.current]);
+    players.forEach((player) => {
+      if (!player) return;
+      sampleSubscriptionsRef.current.get(player)?.remove();
+      sampleSubscriptionsRef.current.delete(player);
+      try {
+        player.pause();
+      } catch {
+        // The native player may already be disposed after an interrupted transition.
+      }
+      try {
+        player.remove();
+      } catch {
+        // The native player may already be disposed after an interrupted transition.
+      }
+    });
+    currentPlayerRef.current = null;
+    transitionPlayerRef.current = null;
   }, []);
 
   useEffect(() => releasePlayer, [releasePlayer]);
@@ -183,10 +213,11 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     if (player.isAudioSamplingSupported) {
       const tracker = createLiveTempoTracker();
       player.setAudioSamplingEnabled(true);
-      sampleSubscriptionRef.current = player.addListener("audioSampleUpdate", (sample) => {
+      const subscription = player.addListener("audioSampleUpdate", (sample) => {
         const estimate = tracker.push(sample.timestamp, sample.channels[0]?.frames ?? []);
         if (estimate) updateTrackProfile(track.id, { tempo: estimate.tempo, energy: estimate.energy });
       });
+      sampleSubscriptionsRef.current.set(player, subscription);
     }
     return player;
   }, [updateTrackProfile]);
@@ -197,9 +228,12 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     try {
       setIssue(undefined);
       setNotice(undefined);
-      if (Platform.OS !== "web" && !new File(nextTrack.uri).exists) {
-        setIssue("This saved audio file is no longer available. Remove it and import the original file again.");
-        return;
+      if (Platform.OS !== "web" && nextTrack.uri.startsWith("file://")) {
+        const fileInfo = await FileSystem.getInfoAsync(nextTrack.uri);
+        if (!fileInfo.exists) {
+          setIssue("This saved audio file is no longer available. Remove it and import the original file again.");
+          return;
+        }
       }
       releasePlayer();
       const player = createPlayerFor(nextTrack);
@@ -228,37 +262,65 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
 
     if (plan.strategy === "clean-handoff") return;
 
+    let incomingPlayer: ManagedPlayer | null = null;
     try {
       mixingRef.current = true;
       setPlayback((snapshot) => ({ ...snapshot, isMixing: true }));
-      const incomingPlayer = createPlayerFor(incoming);
-      incomingPlayer.volume = 0;
-      incomingPlayer.setPlaybackRate(plan.nextPlaybackRate);
-      incomingPlayer.play();
+      incomingPlayer = createPlayerFor(incoming);
+      const preparedIncomingPlayer = incomingPlayer;
+      transitionPlayerRef.current = preparedIncomingPlayer;
+      preparedIncomingPlayer.volume = 0;
+      preparedIncomingPlayer.setPlaybackRate(plan.nextPlaybackRate);
+      preparedIncomingPlayer.play();
 
       const start = Date.now();
       const durationMs = plan.transitionSeconds * 1000;
-      const timer = setInterval(() => {
+      transitionTimerRef.current = setInterval(() => {
+        if (currentPlayerRef.current !== outgoingPlayer || transitionPlayerRef.current !== preparedIncomingPlayer) {
+          if (transitionTimerRef.current) clearInterval(transitionTimerRef.current);
+          transitionTimerRef.current = null;
+          mixingRef.current = false;
+          return;
+        }
         const progress = Math.min(1, (Date.now() - start) / durationMs);
         outgoingPlayer.volume = 1 - progress;
-        incomingPlayer.volume = progress;
+        preparedIncomingPlayer.volume = progress;
         if (progress >= 1) {
-          clearInterval(timer);
+          if (transitionTimerRef.current) clearInterval(transitionTimerRef.current);
+          transitionTimerRef.current = null;
+          sampleSubscriptionsRef.current.get(outgoingPlayer)?.remove();
+          sampleSubscriptionsRef.current.delete(outgoingPlayer);
           outgoingPlayer.pause();
           outgoingPlayer.remove();
-          currentPlayerRef.current = incomingPlayer;
+          currentPlayerRef.current = preparedIncomingPlayer;
+          transitionPlayerRef.current = null;
           mixingRef.current = false;
           setCurrentIndex(followingIndex);
           setPlayback({
             playing: true,
-            position: incomingPlayer.currentTime || 0,
-            duration: incomingPlayer.duration || 0,
+            position: preparedIncomingPlayer.currentTime || 0,
+            duration: preparedIncomingPlayer.duration || 0,
             isMixing: false,
           });
           haptic.confirm();
         }
       }, 50);
     } catch {
+      if (transitionTimerRef.current) {
+        clearInterval(transitionTimerRef.current);
+        transitionTimerRef.current = null;
+      }
+      if (incomingPlayer) {
+        sampleSubscriptionsRef.current.get(incomingPlayer)?.remove();
+        sampleSubscriptionsRef.current.delete(incomingPlayer);
+        try {
+          incomingPlayer.pause();
+          incomingPlayer.remove();
+        } catch {
+          // Best-effort native cleanup after a failed transition setup.
+        }
+      }
+      transitionPlayerRef.current = null;
       mixingRef.current = false;
       setPlayback((snapshot) => ({ ...snapshot, isMixing: false }));
       setIssue("AutoMix could not prepare the next file. Playback will continue without a transition.");
@@ -311,50 +373,74 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
       });
       if (result.canceled || !result.assets) return;
 
-      const supportedAssets = result.assets.filter(isSupportedAudioAsset);
+      const supportedAssets = result.assets.filter((asset) => (
+        isSupportedAudioAsset(asset) && (asset.size === undefined || asset.size === null || asset.size > 0)
+      ));
       if (supportedAssets.length === 0) {
         setIssue("Select a local audio file such as MP3, M4A, WAV, FLAC, OGG, or AAC.");
         return;
       }
 
-      const existingImportKeys = new Set(libraryRef.current.map((track) => trackImportKey({
+      const importKeys = new Set(libraryRef.current.map((track) => trackImportKey({
         name: track.fileName,
         size: track.bytes,
         uri: track.uri,
       })));
-      const newAssets = supportedAssets.filter((asset) => !existingImportKeys.has(trackImportKey(asset)));
+      const newAssets = supportedAssets.filter((asset) => {
+        const key = trackImportKey(asset);
+        if (importKeys.has(key)) return false;
+        importKeys.add(key);
+        return true;
+      });
       if (newAssets.length === 0) {
         setNotice("Those files are already in your local library.");
         return;
       }
 
-      const imported = newAssets.map((asset, index): LocalTrack => {
-        let uri = asset.uri;
-        if (Platform.OS !== "web") {
-          const libraryDirectory = new Directory(Paths.document, "automix-library");
-          libraryDirectory.create({ idempotent: true, intermediates: true });
-          const safeName = safeAudioFileName(asset.name);
-          const destination = new File(libraryDirectory, `${Date.now()}-${index}-${safeName}`);
-          const source = new File(asset.uri);
-          source.copy(destination);
-          if (!destination.exists) throw new Error("Audio file could not be copied into the local library.");
-          uri = destination.uri;
+      const imported: LocalTrack[] = [];
+      let failedImports = 0;
+      const importStartedAt = Date.now();
+      const destinationDirectory = managedLibraryUri();
+      if (Platform.OS !== "web") {
+        const directoryInfo = await FileSystem.getInfoAsync(destinationDirectory);
+        if (!directoryInfo.exists) {
+          await FileSystem.makeDirectoryAsync(destinationDirectory, { intermediates: true });
         }
-        return {
-          id: `${Date.now()}-${index}-${asset.name}`,
-          title: titleFromFileName(asset.name),
-          artist: "Imported audio",
-          uri,
-          fileName: asset.name,
-          mimeType: asset.mimeType ?? undefined,
-          bytes: asset.size ?? undefined,
-          profile: {},
-        };
-      });
+      }
+
+      for (const [index, asset] of newAssets.entries()) {
+        let uri = asset.uri;
+        try {
+          if (Platform.OS !== "web") {
+            const destination = `${destinationDirectory}${importStartedAt}-${index}-${safeAudioFileName(asset.name)}`;
+            await FileSystem.copyAsync({ from: asset.uri, to: destination });
+            const destinationInfo = await FileSystem.getInfoAsync(destination);
+            if (!destinationInfo.exists) throw new Error("Audio file could not be copied into the local library.");
+            uri = destination;
+          }
+          imported.push({
+            id: `${importStartedAt}-${index}-${asset.name}`,
+            title: titleFromFileName(asset.name),
+            artist: "Imported audio",
+            uri,
+            fileName: asset.name,
+            mimeType: asset.mimeType ?? undefined,
+            bytes: asset.size ?? undefined,
+            profile: {},
+          });
+        } catch {
+          failedImports += 1;
+        }
+      }
+
+      if (imported.length === 0) {
+        setIssue("Audio import failed. Confirm the selected files are available locally and try again.");
+        return;
+      }
 
       if (libraryRef.current.length === 0 && imported.length > 0) setCurrentIndex(0);
       setLibrary((existing) => [...existing, ...imported]);
-      setNotice(`${imported.length} ${imported.length === 1 ? "track was" : "tracks were"} added to your local library.`);
+      setNotice(`${imported.length} ${imported.length === 1 ? "track was" : "tracks were"} added to your local library.${failedImports > 0 ? ` ${failedImports} could not be copied.` : ""}`);
       haptic.confirm();
     } catch {
       setIssue("Audio import failed. Confirm the file is available locally and try again.");
@@ -414,27 +500,54 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     haptic.medium();
   }, []);
 
-  const removeTrack = useCallback((id: string) => {
-    setLibrary((current) => {
-      const index = current.findIndex((track) => track.id === id);
-      const next = current.filter((track) => track.id !== id);
-      if (index === currentIndexRef.current) {
-        releasePlayer();
-        setCurrentIndex(-1);
-        setPlayback({ playing: false, position: 0, duration: 0, isMixing: false });
-      } else if (index >= 0 && index < currentIndexRef.current) {
-        setCurrentIndex((value) => value - 1);
-      }
-      return next;
-    });
-  }, [releasePlayer]);
+  const deleteManagedTrackFile = useCallback(async (track: LocalTrack) => {
+    if (Platform.OS === "web" || !isManagedLibraryUri(track.uri)) return true;
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(track.uri);
+      if (fileInfo.exists) await FileSystem.deleteAsync(track.uri, { idempotent: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
 
-  const clearLibrary = useCallback(() => {
+  const removeTrack = useCallback(async (id: string) => {
+    const current = libraryRef.current;
+    const index = current.findIndex((track) => track.id === id);
+    if (index < 0) return;
+
+    const removedTrack = current[index];
+    const next = current.filter((track) => track.id !== id);
+    libraryRef.current = next;
+    setLibrary(next);
+    if (index === currentIndexRef.current) {
+      releasePlayer();
+      currentIndexRef.current = -1;
+      setCurrentIndex(-1);
+      setPlayback({ playing: false, position: 0, duration: 0, isMixing: false });
+    } else if (index < currentIndexRef.current) {
+      currentIndexRef.current -= 1;
+      setCurrentIndex(currentIndexRef.current);
+    }
+
+    if (!(await deleteManagedTrackFile(removedTrack))) {
+      setIssue("The track was removed from the queue, but its local copy could not be deleted.");
+    }
+  }, [deleteManagedTrackFile, releasePlayer]);
+
+  const clearLibrary = useCallback(async () => {
+    const tracks = libraryRef.current;
     releasePlayer();
+    libraryRef.current = [];
+    currentIndexRef.current = -1;
     setLibrary([]);
     setCurrentIndex(-1);
     setPlayback({ playing: false, position: 0, duration: 0, isMixing: false });
-  }, [releasePlayer]);
+    const results = await Promise.all(tracks.map(deleteManagedTrackFile));
+    if (results.some((deleted) => !deleted)) {
+      setIssue("The queue was cleared, but some local audio copies could not be deleted.");
+    }
+  }, [deleteManagedTrackFile, releasePlayer]);
 
   const currentTrack = currentIndex >= 0 ? library[currentIndex] : undefined;
   const nextIndex = nextIndexFor(currentIndex, library);

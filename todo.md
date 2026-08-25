@@ -21,3 +21,8 @@
 - [x] Replace per-push APK builds with conditional nightly Android releases
 - [x] Run and verify the initial conditional nightly Android release
 - [x] Document the policy to batch minor fixes and reserve manual APK builds for urgent requests
+- [x] Perform a comprehensive Android app, native audio/import, and release-workflow bug check
+- [x] Fix transition-player timer and audio-sampling lifecycle leaks
+- [x] Make multi-file import asynchronous, duplicate-safe, and partial-failure tolerant
+- [x] Delete managed local audio files when tracks or the full library are removed
+- [x] Align React Navigation dependency declarations with Expo SDK 54 diagnostics
