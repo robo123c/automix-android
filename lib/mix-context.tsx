@@ -22,6 +22,11 @@ import { haptic } from "@/lib/haptics";
 import { titleFromFileName } from "@/lib/track-utils";
 import { createLiveTempoTracker } from "@/lib/live-tempo";
 import {
+  isSupportedAudioAsset,
+  safeAudioFileName,
+  trackImportKey,
+} from "@/lib/audio-import";
+import {
   DEFAULT_MIX_SETTINGS,
   parseMixSettings,
   serializeMixSettings,
@@ -58,6 +63,7 @@ type MixContextValue = {
   activePlan: ReturnType<typeof buildTransitionPlan> | null;
   importState: "idle" | "importing";
   issue?: string;
+  notice?: string;
   isReady: boolean;
   importAudio: () => Promise<void>;
   playTrack: (id: string) => Promise<void>;
@@ -90,6 +96,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
   });
   const [importState, setImportState] = useState<"idle" | "importing">("idle");
   const [issue, setIssue] = useState<string>();
+  const [notice, setNotice] = useState<string>();
   const [isReady, setIsReady] = useState(false);
 
   const currentPlayerRef = useRef<ManagedPlayer | null>(null);
@@ -111,6 +118,8 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
       playsInSilentMode: true,
       shouldPlayInBackground: true,
       interruptionModeAndroid: "duckOthers",
+    }).catch(() => {
+      setIssue("Audio playback setup was unavailable. Restart the app and try again.");
     });
   }, []);
 
@@ -187,6 +196,11 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     if (!nextTrack) return;
     try {
       setIssue(undefined);
+      setNotice(undefined);
+      if (Platform.OS !== "web" && !new File(nextTrack.uri).exists) {
+        setIssue("This saved audio file is no longer available. Remove it and import the original file again.");
+        return;
+      }
       releasePlayer();
       const player = createPlayerFor(nextTrack);
       currentPlayerRef.current = player;
@@ -288,6 +302,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
   const importAudio = useCallback(async () => {
     setImportState("importing");
     setIssue(undefined);
+    setNotice(undefined);
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["audio/*"],
@@ -296,15 +311,33 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
       });
       if (result.canceled || !result.assets) return;
 
-      const imported = result.assets.map((asset, index): LocalTrack => {
+      const supportedAssets = result.assets.filter(isSupportedAudioAsset);
+      if (supportedAssets.length === 0) {
+        setIssue("Select a local audio file such as MP3, M4A, WAV, FLAC, OGG, or AAC.");
+        return;
+      }
+
+      const existingImportKeys = new Set(libraryRef.current.map((track) => trackImportKey({
+        name: track.fileName,
+        size: track.bytes,
+        uri: track.uri,
+      })));
+      const newAssets = supportedAssets.filter((asset) => !existingImportKeys.has(trackImportKey(asset)));
+      if (newAssets.length === 0) {
+        setNotice("Those files are already in your local library.");
+        return;
+      }
+
+      const imported = newAssets.map((asset, index): LocalTrack => {
         let uri = asset.uri;
         if (Platform.OS !== "web") {
           const libraryDirectory = new Directory(Paths.document, "automix-library");
           libraryDirectory.create({ idempotent: true, intermediates: true });
-          const safeName = asset.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const safeName = safeAudioFileName(asset.name);
           const destination = new File(libraryDirectory, `${Date.now()}-${index}-${safeName}`);
           const source = new File(asset.uri);
           source.copy(destination);
+          if (!destination.exists) throw new Error("Audio file could not be copied into the local library.");
           uri = destination.uri;
         }
         return {
@@ -313,14 +346,15 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
           artist: "Imported audio",
           uri,
           fileName: asset.name,
-          mimeType: asset.mimeType,
-          bytes: asset.size,
+          mimeType: asset.mimeType ?? undefined,
+          bytes: asset.size ?? undefined,
           profile: {},
         };
       });
 
       if (libraryRef.current.length === 0 && imported.length > 0) setCurrentIndex(0);
       setLibrary((existing) => [...existing, ...imported]);
+      setNotice(`${imported.length} ${imported.length === 1 ? "track was" : "tracks were"} added to your local library.`);
       haptic.confirm();
     } catch {
       setIssue("Audio import failed. Confirm the file is available locally and try again.");
@@ -420,6 +454,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     activePlan,
     importState,
     issue,
+    notice,
     isReady,
     importAudio,
     playTrack,
@@ -439,6 +474,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     importState,
     isReady,
     issue,
+    notice,
     library,
     nextTrack,
     playback,

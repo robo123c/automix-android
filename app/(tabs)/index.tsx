@@ -25,6 +25,7 @@ export default function PlayerScreen() {
     seekTo,
     updateSettings,
     issue,
+    notice,
   } = useMix();
   const [progressWidth, setProgressWidth] = useState(0);
   const progress = playback.duration > 0 ? playback.position / playback.duration : 0;
@@ -36,10 +37,12 @@ export default function PlayerScreen() {
           <View style={styles.emptyIcon}><MaterialIcons name="auto-awesome" color="#C7FF3D" size={34} /></View>
           <Text style={styles.emptyTitle}>A smarter way to move between songs.</Text>
           <Text style={styles.emptyCopy}>Import local audio to build an Android queue with tempo-aware transitions, safe fallback logic, and controls that explain every mix choice.</Text>
-          <Pressable onPress={() => void importAudio()} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+          <Pressable disabled={importState === "importing"} onPress={() => void importAudio()} style={({ pressed }) => [styles.primaryButton, importState === "importing" && styles.disabled, pressed && styles.pressed]}>
             <MaterialIcons name="library-add" color="#0A0B10" size={20} />
             <Text style={styles.primaryButtonText}>{importState === "importing" ? "Opening files…" : "Import music"}</Text>
           </Pressable>
+          {issue ? <Text style={styles.issue}>{issue}</Text> : null}
+          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
           <View style={styles.boundaryCard}>
             <MaterialIcons name="info-outline" color="#6A8CFF" size={18} />
             <Text style={styles.boundaryText}>AutoMix plays files you select. It does not access Apple Music or recreate Apple’s private audio models.</Text>
@@ -105,6 +108,7 @@ export default function PlayerScreen() {
       {playback.isMixing ? <View style={styles.mixingState}><View style={styles.mixingDot} /><Text style={styles.mixingText}>MIXING NOW</Text></View> : null}
       <TransitionCard plan={activePlan} nextTitle={nextTrack?.title} onPress={() => router.push("/queue" as never)} />
       {issue ? <Text style={styles.issue}>{issue}</Text> : null}
+      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       <Text style={styles.footerHint}>{library.length} {library.length === 1 ? "track" : "tracks"} in your local library</Text>
     </ScreenContainer>
   );
@@ -117,6 +121,7 @@ const styles = StyleSheet.create({
   emptyCopy: { color: "#9B9EA8", marginTop: 13, fontSize: 15, lineHeight: 22, textAlign: "center" },
   primaryButton: { marginTop: 30, height: 54, paddingHorizontal: 22, borderRadius: 18, flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: "#C7FF3D" },
   primaryButtonText: { color: "#0A0B10", fontSize: 15, lineHeight: 20, fontWeight: "800" },
+  disabled: { opacity: 0.58 },
   boundaryCard: { marginTop: 23, padding: 14, borderWidth: 1, borderColor: "#272A34", backgroundColor: "#161820", borderRadius: 18, flexDirection: "row", gap: 10, alignItems: "flex-start" },
   boundaryText: { flex: 1, color: "#9B9EA8", fontSize: 12, lineHeight: 18 },
   header: { paddingTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -149,5 +154,6 @@ const styles = StyleSheet.create({
   mixingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#C7FF3D" },
   mixingText: { color: "#C7FF3D", fontSize: 10, lineHeight: 14, fontWeight: "800", letterSpacing: 1.2 },
   issue: { marginTop: 9, color: "#FFC74A", fontSize: 12, lineHeight: 17, textAlign: "center" },
+  notice: { marginTop: 9, color: "#C7FF3D", fontSize: 12, lineHeight: 17, textAlign: "center" },
   footerHint: { color: "#747783", fontSize: 11, lineHeight: 15, textAlign: "center", marginTop: 12 },
 });

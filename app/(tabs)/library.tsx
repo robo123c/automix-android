@@ -11,10 +11,10 @@ function LibraryRow({ track, onPress }: { track: LocalTrack; onPress: () => void
 }
 
 export default function LibraryScreen() {
-  const { library, importAudio, importState, playTrack, settings, updateSettings, issue } = useMix();
+  const { library, importAudio, importState, playTrack, settings, updateSettings, issue, notice } = useMix();
   return (
     <ScreenContainer containerClassName="bg-background" className="px-5" edges={["top", "left", "right"]}>
-      <View style={styles.header}><View><Text style={styles.title}>Library</Text><Text style={styles.subtitle}>YOUR LOCAL AUDIO</Text></View><Pressable onPress={() => void importAudio()} style={({ pressed }) => [styles.importButton, pressed && styles.pressed]}><MaterialIcons name="add" color="#0A0B10" size={22} /><Text style={styles.importText}>{importState === "importing" ? "Opening" : "Import"}</Text></Pressable></View>
+      <View style={styles.header}><View><Text style={styles.title}>Library</Text><Text style={styles.subtitle}>YOUR LOCAL AUDIO</Text></View><Pressable disabled={importState === "importing"} onPress={() => void importAudio()} style={({ pressed }) => [styles.importButton, importState === "importing" && styles.disabled, pressed && styles.pressed]}><MaterialIcons name="add" color="#0A0B10" size={22} /><Text style={styles.importText}>{importState === "importing" ? "Opening" : "Import"}</Text></Pressable></View>
       <View style={styles.settingsCard}>
         <View style={styles.settingsCopy}><Text style={styles.settingsTitle}>AutoMix</Text><Text style={styles.settingsText}>Use a beat-aware blend when compatibility is available; otherwise protect the handoff.</Text></View>
         <Switch value={settings.autoMixEnabled} onValueChange={(autoMixEnabled) => updateSettings({ autoMixEnabled })} trackColor={{ false: "#323643", true: "#8AAC2C" }} thumbColor={settings.autoMixEnabled ? "#C7FF3D" : "#F6F7F2"} />
@@ -34,6 +34,7 @@ export default function LibraryScreen() {
         showsVerticalScrollIndicator={false}
       />
       {issue ? <Text style={styles.issue}>{issue}</Text> : null}
+      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
     </ScreenContainer>
   );
 }
@@ -44,6 +45,7 @@ const styles = StyleSheet.create({
   subtitle: { color: "#747783", fontSize: 10, lineHeight: 14, fontWeight: "800", letterSpacing: 1.25, marginTop: 2 },
   importButton: { height: 42, borderRadius: 14, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#C7FF3D" },
   importText: { color: "#0A0B10", fontSize: 12, fontWeight: "900" },
+  disabled: { opacity: 0.58 },
   settingsCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 15, borderRadius: 21, backgroundColor: "#161820", borderWidth: 1, borderColor: "#292C38" },
   settingsCopy: { flex: 1 },
   settingsTitle: { color: "#F6F7F2", fontSize: 14, lineHeight: 19, fontWeight: "800" },
@@ -72,5 +74,6 @@ const styles = StyleSheet.create({
   emptyTitle: { color: "#F6F7F2", marginTop: 13, fontSize: 18, lineHeight: 24, fontWeight: "800" },
   emptyCopy: { color: "#9B9EA8", marginTop: 6, textAlign: "center", fontSize: 13, lineHeight: 19 },
   issue: { color: "#FFC74A", fontSize: 12, lineHeight: 17, textAlign: "center", paddingVertical: 8 },
+  notice: { color: "#C7FF3D", fontSize: 12, lineHeight: 17, textAlign: "center", paddingVertical: 8 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
 });

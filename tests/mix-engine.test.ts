@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildTransitionPlan, type MixSettings } from "../lib/mix-engine";
 import { createLiveTempoTracker } from "../lib/live-tempo";
 import { parseMixSettings, serializeMixSettings } from "../lib/mix-settings";
+import { isSupportedAudioAsset, safeAudioFileName, trackImportKey } from "../lib/audio-import";
 
 const baseSettings: MixSettings = {
   autoMixEnabled: true,
@@ -55,5 +56,13 @@ describe("buildTransitionPlan", () => {
       preserveAlbums: false,
     });
     expect(parseMixSettings('{"transitionSeconds":900}').transitionSeconds).toBe(8);
+  });
+
+  it("accepts common local audio assets and creates stable import keys", () => {
+    expect(isSupportedAudioAsset({ name: "midnight.wav", uri: "file://midnight.wav" })).toBe(true);
+    expect(isSupportedAudioAsset({ name: "set", mimeType: "audio/mpeg", uri: "file://set" })).toBe(true);
+    expect(isSupportedAudioAsset({ name: "cover.jpg", mimeType: "image/jpeg", uri: "file://cover.jpg" })).toBe(false);
+    expect(safeAudioFileName("night / drive?.mp3")).toBe("night___drive_.mp3");
+    expect(trackImportKey({ name: "Set.MP3", size: 1024, uri: "file://one" })).toBe(trackImportKey({ name: "set.mp3", size: 1024, uri: "file://two" }));
   });
 });
