@@ -86,7 +86,10 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    "expo-asset",
     "expo-document-picker",
+    "expo-font",
+    "expo-web-browser",
     [
       "expo-audio",
       {

@@ -12,3 +12,6 @@
 - [x] Add GitHub Actions quality checks and Android build artifact workflow
 - [x] Add Gradle caching to the GitHub Actions Android build
 - [x] Replace the debug APK workflow with a standalone release APK to fix splash-screen launch failure
+- [x] Find and evaluate installable skills for Expo, React Native, and Android mobile development
+- [x] Install the recommended Expo and React Native skills, then fix the Android startup failure
+- [x] Install obra/superpowers and apply its debugging guidance to the Android startup failure
