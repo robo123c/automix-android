@@ -85,14 +85,14 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --non-interactive --no-install
 
-      - name: Assemble debug APK
+      - name: Assemble standalone release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --build-cache
+        run: ./gradlew assembleRelease --no-daemon --build-cache
 
-      - name: Upload debug APK
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoMix-android-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: AutoMix-android-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14

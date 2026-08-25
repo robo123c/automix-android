@@ -11,3 +11,4 @@
 - [x] Create a private GitHub repository and push the AutoMix Android project
 - [x] Add GitHub Actions quality checks and Android build artifact workflow
 - [x] Add Gradle caching to the GitHub Actions Android build
+- [x] Replace the debug APK workflow with a standalone release APK to fix splash-screen launch failure
