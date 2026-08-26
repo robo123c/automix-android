@@ -37,7 +37,7 @@ export default function PlayerScreen() {
           <View style={styles.emptyIcon}><MaterialIcons name="auto-awesome" color="#C7FF3D" size={34} /></View>
           <Text style={styles.emptyTitle}>A smarter way to move between songs.</Text>
           <Text style={styles.emptyCopy}>Import local audio to build an Android queue with tempo-aware transitions, safe fallback logic, and controls that explain every mix choice.</Text>
-          <Pressable disabled={importState === "importing"} onPress={() => void importAudio()} style={({ pressed }) => [styles.primaryButton, importState === "importing" && styles.disabled, pressed && styles.pressed]}>
+          <Pressable accessibilityState={{ disabled: importState === "importing" }} onPress={() => { if (importState !== "importing") void importAudio(); }} style={({ pressed }) => [styles.primaryButton, importState === "importing" && styles.disabled, pressed && styles.pressed]}>
             <MaterialIcons name="library-add" color="#0A0B10" size={20} />
             <Text style={styles.primaryButtonText}>{importState === "importing" ? "Opening files…" : "Import music"}</Text>
           </Pressable>

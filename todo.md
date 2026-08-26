@@ -30,3 +30,8 @@
 - [x] Increment Android versioning so the corrected APK installs over older builds
 - [ ] Trace and correct the persistent obsolete AutoMix build shown after installation
 - [x] Produce a separately packaged, visibly identified import-control test APK
+- [ ] Collect installed-package evidence and identify the root cause before another UI or release change
+- [ ] Trace the native release build and JavaScript bundle boundary causing obsolete rendered UI
+- [ ] Collect AutoMix Import Test version and install-source evidence from Android settings without a computer
+- [ ] Trace the runtime-rendering cause after confirming AutoMix Import Test 1.0.2 on-device
+- [ ] Test whether Android suppression of disabled import Pressables causes the missing controls
