@@ -42,6 +42,6 @@
 - [x] Add an in-app Android update checker and user-confirmed installer handoff
 - [x] Make the AutoMix repository public and publish credential-free APK update metadata
 - [x] Generate a strictly increasing Android version code for every released APK
-- [ ] Trigger and verify an urgent updater-enabled Android APK release
-- [ ] Ensure the published updater manifest references the exact APK asset name
-- [ ] Force APK publication when the workflow is manually dispatched
+- [x] Trigger and verify an urgent updater-enabled Android APK release
+- [x] Ensure the published updater manifest references the exact APK asset name
+- [x] Force APK publication when the workflow is manually dispatched
