@@ -26,3 +26,5 @@
 - [x] Make multi-file import asynchronous, duplicate-safe, and partial-failure tolerant
 - [x] Delete managed local audio files when tracks or the full library are removed
 - [x] Align React Navigation dependency declarations with Expo SDK 54 diagnostics
+- [x] Investigate and correct the installed APK missing the current import controls
+- [x] Increment Android versioning so the corrected APK installs over older builds
