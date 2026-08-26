@@ -28,3 +28,5 @@
 - [x] Align React Navigation dependency declarations with Expo SDK 54 diagnostics
 - [x] Investigate and correct the installed APK missing the current import controls
 - [x] Increment Android versioning so the corrected APK installs over older builds
+- [ ] Trace and correct the persistent obsolete AutoMix build shown after installation
+- [x] Produce a separately packaged, visibly identified import-control test APK
