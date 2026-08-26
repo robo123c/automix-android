@@ -179,6 +179,7 @@ jobs:
           update_manifest="automix-update.json"
           version="$(npx expo config --type public --json | jq -r '.version')"
           version_code="$(npx expo config --type public --json | jq -r '.android.versionCode')"
+          apk_size_bytes="$(stat --format=%s "${apk_path}")"
           apk_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${release_tag}/${release_apk}"
 
           if [[ "${version_code}" != "${AUTOMIX_ANDROID_VERSION_CODE}" ]]; then
@@ -189,9 +190,10 @@ jobs:
           jq -n \
             --arg version "${version}" \
             --argjson versionCode "${version_code}" \
+            --argjson apkSizeBytes "${apk_size_bytes}" \
             --arg apkUrl "${apk_url}" \
             --arg notes "Nightly AutoMix build from ${GITHUB_SHA::7}." \
-            '{version: $version, versionCode: $versionCode, apkUrl: $apkUrl, notes: $notes}' > "${update_manifest}"
+            '{version: $version, versionCode: $versionCode, apkUrl: $apkUrl, notes: $notes, apkSizeBytes: $apkSizeBytes}' > "${update_manifest}"
 
           cp "${apk_path}" "${release_apk}"
           gh release create "${release_tag}" "${release_apk}" "${update_manifest}" \

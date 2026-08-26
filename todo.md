@@ -45,3 +45,14 @@
 - [x] Trigger and verify an urgent updater-enabled Android APK release
 - [x] Ensure the published updater manifest references the exact APK asset name
 - [x] Force APK publication when the workflow is manually dispatched
+- [x] Add clearer updater status, failure recovery, and release notes to the Library experience
+- [x] Define and display an at-a-glance installed versus available version summary
+- [x] Add explicit checking, current, update-ready, browser-handoff, and recoverable-error updater states
+- [x] Add release-note, APK-size, and Android-install guidance in the update-ready state
+- [x] Add a retry path plus plain-language offline, missing-manifest, and invalid-release guidance
+- [x] Verify updater controls remain accessible, one-handed, and non-blocking alongside library controls
+- [x] Implement and validate the Phase 1 updater-polish interface as one bundled source change
+- [ ] Add library search, sorting, and faster queue management controls
+- [ ] Improve transition timing using stored per-track analysis and user feedback controls
+- [ ] Expand device-level regression testing for import, playback, and update flows
+- [ ] Bundle the next verified feature set into one Android release and collect test feedback
