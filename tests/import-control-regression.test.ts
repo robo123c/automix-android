@@ -8,6 +8,7 @@ const importSurfaces = [
   readFileSync("app/(tabs)/index.tsx", "utf8"),
   readFileSync("app/(tabs)/library.tsx", "utf8"),
 ].join("\n");
+const importButtonSource = readFileSync("components/import-music-button.tsx", "utf8");
 
 describe("import-control regression protection", () => {
   it("starts an import only while idle, without requiring a native disabled prop", () => {
@@ -20,9 +21,10 @@ describe("import-control regression protection", () => {
   });
 
   it("keeps every import surface visible and uses the guarded import action", () => {
-    expect(importSurfaces).toContain('accessibilityState={{ disabled: importState === "importing" }}');
-    expect(importSurfaces).toContain("triggerImportIfAvailable(importState, importAudio)");
-    expect(importSurfaces).not.toContain('disabled={importState === "importing"}');
+    expect(importButtonSource).toContain('accessibilityState={{ disabled: importState === "importing" }}');
+    expect(importButtonSource).toContain("triggerImportIfAvailable(importState, onImport)");
+    expect(importButtonSource).not.toContain('disabled={importState === "importing"}');
+    expect(importSurfaces).toContain("ImportMusicButton");
     expect(importSurfaces).toContain("Import music");
     expect(importSurfaces).toContain("Add music");
   });

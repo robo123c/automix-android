@@ -2,7 +2,8 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { FlatList, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
-import { triggerImportIfAvailable } from "@/lib/import-control";
+import { ImportMusicButton } from "@/components/import-music-button";
+import { importProgressLabel } from "@/lib/import-progress";
 import { useMix, type LocalTrack } from "@/lib/mix-context";
 import { artworkPalette } from "@/lib/track-utils";
 
@@ -12,10 +13,10 @@ function LibraryRow({ track, onPress }: { track: LocalTrack; onPress: () => void
 }
 
 export default function LibraryScreen() {
-  const { library, importAudio, importState, playTrack, settings, updateSettings, issue, notice } = useMix();
+  const { library, importAudio, importState, importProgress, playTrack, settings, updateSettings, issue, notice } = useMix();
   return (
     <ScreenContainer containerClassName="bg-background" className="px-5" edges={["top", "left", "right"]}>
-      <View style={styles.header}><View><Text style={styles.title}>Library</Text><Text style={styles.subtitle}>YOUR LOCAL AUDIO</Text></View><Pressable accessibilityState={{ disabled: importState === "importing" }} onPress={() => triggerImportIfAvailable(importState, importAudio)} style={({ pressed }) => [styles.importButton, importState === "importing" && styles.disabled, pressed && styles.pressed]}><MaterialIcons name="add" color="#0A0B10" size={22} /><Text style={styles.importText}>{importState === "importing" ? "Opening" : "Import"}</Text></Pressable></View>
+      <View style={styles.header}><View><Text style={styles.title}>Library</Text><Text style={styles.subtitle}>YOUR LOCAL AUDIO</Text></View><ImportMusicButton label={importState === "importing" ? importProgressLabel(importProgress) : "Import"} importState={importState} onImport={importAudio} icon="add" testID="library-import-control" style={styles.importButton} importingStyle={styles.disabled} pressedStyle={styles.pressed} textStyle={styles.importText} /></View>
       <View style={styles.settingsCard}>
         <View style={styles.settingsCopy}><Text style={styles.settingsTitle}>AutoMix</Text><Text style={styles.settingsText}>Use a beat-aware blend when compatibility is available; otherwise protect the handoff.</Text></View>
         <Switch value={settings.autoMixEnabled} onValueChange={(autoMixEnabled) => updateSettings({ autoMixEnabled })} trackColor={{ false: "#323643", true: "#8AAC2C" }} thumbColor={settings.autoMixEnabled ? "#C7FF3D" : "#F6F7F2"} />
@@ -30,7 +31,7 @@ export default function LibraryScreen() {
         data={library}
         keyExtractor={(track) => track.id}
         renderItem={({ item }) => <LibraryRow track={item} onPress={() => void playTrack(item.id)} />}
-        ListEmptyComponent={<View style={styles.empty}><MaterialIcons name="audio-file" color="#747783" size={31} /><Text style={styles.emptyTitle}>No local tracks yet</Text><Text style={styles.emptyCopy}>Choose audio files from your phone. They stay in the app’s local library for playback and mix planning.</Text><Pressable accessibilityState={{ disabled: importState === "importing" }} onPress={() => triggerImportIfAvailable(importState, importAudio)} style={({ pressed }) => [styles.emptyImportButton, importState === "importing" && styles.disabled, pressed && styles.pressed]}><MaterialIcons name="library-add" color="#0A0B10" size={20} /><Text style={styles.emptyImportText}>{importState === "importing" ? "Opening files…" : "Add music"}</Text></Pressable></View>}
+        ListEmptyComponent={<View style={styles.empty}><MaterialIcons name="audio-file" color="#747783" size={31} /><Text style={styles.emptyTitle}>No local tracks yet</Text><Text style={styles.emptyCopy}>Choose audio files from your phone. They stay in the app’s local library for playback and mix planning.</Text><ImportMusicButton label={importState === "importing" ? importProgressLabel(importProgress) : "Add music"} importState={importState} onImport={importAudio} testID="library-empty-import-control" style={styles.emptyImportButton} importingStyle={styles.disabled} pressedStyle={styles.pressed} textStyle={styles.emptyImportText} /></View>}
         contentContainerStyle={library.length === 0 ? styles.emptyList : styles.list}
         showsVerticalScrollIndicator={false}
       />

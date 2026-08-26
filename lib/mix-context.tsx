@@ -27,6 +27,7 @@ import {
   safeAudioFileName,
   trackImportKey,
 } from "@/lib/audio-import";
+import { type ImportProgress } from "@/lib/import-progress";
 import {
   DEFAULT_MIX_SETTINGS,
   parseMixSettings,
@@ -64,6 +65,7 @@ type MixContextValue = {
   settings: MixSettings;
   activePlan: ReturnType<typeof buildTransitionPlan> | null;
   importState: "idle" | "importing";
+  importProgress?: ImportProgress;
   issue?: string;
   notice?: string;
   isReady: boolean;
@@ -106,6 +108,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     isMixing: false,
   });
   const [importState, setImportState] = useState<"idle" | "importing">("idle");
+  const [importProgress, setImportProgress] = useState<ImportProgress>();
   const [issue, setIssue] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [isReady, setIsReady] = useState(false);
@@ -401,6 +404,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
       let failedImports = 0;
       const importStartedAt = Date.now();
       const destinationDirectory = managedLibraryUri();
+      setImportProgress({ completed: 0, total: newAssets.length, currentFile: newAssets[0].name });
       if (Platform.OS !== "web") {
         const directoryInfo = await FileSystem.getInfoAsync(destinationDirectory);
         if (!directoryInfo.exists) {
@@ -410,6 +414,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
 
       for (const [index, asset] of newAssets.entries()) {
         let uri = asset.uri;
+        setImportProgress({ completed: index, total: newAssets.length, currentFile: asset.name });
         try {
           if (Platform.OS !== "web") {
             const destination = `${destinationDirectory}${importStartedAt}-${index}-${safeAudioFileName(asset.name)}`;
@@ -431,6 +436,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
         } catch {
           failedImports += 1;
         }
+        setImportProgress({ completed: index + 1, total: newAssets.length, currentFile: asset.name });
       }
 
       if (imported.length === 0) {
@@ -445,6 +451,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     } catch {
       setIssue("Audio import failed. Confirm the file is available locally and try again.");
     } finally {
+      setImportProgress(undefined);
       setImportState("idle");
     }
   }, []);
@@ -566,6 +573,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     settings,
     activePlan,
     importState,
+    importProgress,
     issue,
     notice,
     isReady,
@@ -584,6 +592,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     currentIndex,
     currentTrack,
     importAudio,
+    importProgress,
     importState,
     isReady,
     issue,
