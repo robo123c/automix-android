@@ -168,10 +168,11 @@ jobs:
           release_tag="android-nightly-${release_date}-${GITHUB_SHA::7}"
           release_title="AutoMix nightly — ${release_date}"
           apk_path="android/app/build/outputs/apk/release/app-release.apk"
+          release_apk="AutoMix-android-release.apk"
           update_manifest="automix-update.json"
           version="$(npx expo config --type public --json | jq -r '.version')"
           version_code="$(npx expo config --type public --json | jq -r '.android.versionCode')"
-          apk_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${release_tag}/AutoMix-android-release.apk"
+          apk_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${release_tag}/${release_apk}"
 
           if [[ "${version_code}" != "${AUTOMIX_ANDROID_VERSION_CODE}" ]]; then
             echo "Expo config version code (${version_code}) does not match the allocated release version code (${AUTOMIX_ANDROID_VERSION_CODE})." >&2
@@ -185,7 +186,8 @@ jobs:
             --arg notes "Nightly AutoMix build from ${GITHUB_SHA::7}." \
             '{version: $version, versionCode: $versionCode, apkUrl: $apkUrl, notes: $notes}' > "${update_manifest}"
 
-          gh release create "${release_tag}" "${apk_path}#AutoMix-android-release.apk" "${update_manifest}#automix-update.json" \
+          cp "${apk_path}" "${release_apk}"
+          gh release create "${release_tag}" "${release_apk}" "${update_manifest}" \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "${release_title}" \
