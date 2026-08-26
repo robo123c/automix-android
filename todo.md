@@ -28,11 +28,11 @@
 - [x] Align React Navigation dependency declarations with Expo SDK 54 diagnostics
 - [x] Investigate and correct the installed APK missing the current import controls
 - [x] Increment Android versioning so the corrected APK installs over older builds
-- [ ] Trace and correct the persistent obsolete AutoMix build shown after installation
+- [x] Trace and correct the persistent obsolete AutoMix build shown after installation
 - [x] Produce a separately packaged, visibly identified import-control test APK
-- [ ] Collect installed-package evidence and identify the root cause before another UI or release change
-- [ ] Trace the native release build and JavaScript bundle boundary causing obsolete rendered UI
-- [ ] Collect AutoMix Import Test version and install-source evidence from Android settings without a computer
-- [ ] Trace the runtime-rendering cause after confirming AutoMix Import Test 1.0.2 on-device
-- [ ] Test whether Android suppression of disabled import Pressables causes the missing controls
+- [x] Collect installed-package evidence and identify the root cause before another UI or release change
+- [x] Trace the native release build and JavaScript bundle boundary causing obsolete rendered UI
+- [x] Collect AutoMix Import Test version and install-source evidence from Android settings without a computer
+- [x] Trace the runtime-rendering cause after confirming AutoMix Import Test 1.0.2 on-device
+- [x] Test whether Android suppression of disabled import Pressables causes the missing controls
 - [x] Add automated render and interaction regression tests for import controls without native disabled props
