@@ -69,6 +69,13 @@ jobs:
           set -euo pipefail
           marker="android-nightly-latest"
 
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "baseline=manual-dispatch" >> "$GITHUB_OUTPUT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch requested; building and releasing an APK without applying the nightly change filter."
+            exit 0
+          fi
+
           if git rev-parse -q --verify "refs/tags/${marker}^{commit}" >/dev/null; then
             baseline="$(git rev-list -n 1 "${marker}")"
             echo "baseline=${baseline}" >> "$GITHUB_OUTPUT"

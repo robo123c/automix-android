@@ -44,3 +44,4 @@
 - [x] Generate a strictly increasing Android version code for every released APK
 - [ ] Trigger and verify an urgent updater-enabled Android APK release
 - [ ] Ensure the published updater manifest references the exact APK asset name
+- [ ] Force APK publication when the workflow is manually dispatched
