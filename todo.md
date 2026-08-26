@@ -36,6 +36,6 @@
 - [x] Trace the runtime-rendering cause after confirming AutoMix Import Test 1.0.2 on-device
 - [x] Test whether Android suppression of disabled import Pressables causes the missing controls
 - [x] Add automated render and interaction regression tests for import controls without native disabled props
-- [ ] Add component-level native render tests for visible import controls
+- [x] Add component-level native render tests for visible import controls
 - [x] Restore the production AutoMix Android package identity and release versioning
 - [x] Show clear import-progress feedback while local tracks are copied
