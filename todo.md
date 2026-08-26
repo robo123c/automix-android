@@ -35,3 +35,4 @@
 - [ ] Collect AutoMix Import Test version and install-source evidence from Android settings without a computer
 - [ ] Trace the runtime-rendering cause after confirming AutoMix Import Test 1.0.2 on-device
 - [ ] Test whether Android suppression of disabled import Pressables causes the missing controls
+- [x] Add automated render and interaction regression tests for import controls without native disabled props
