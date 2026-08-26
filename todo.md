@@ -56,7 +56,8 @@
 - [ ] Define search behavior, empty states, and one-handed Library filter controls
 - [ ] Define persistent sort preferences and non-destructive Library ordering rules
 - [ ] Define queue reorder, remove, play-next, and clear-queue interactions
-- [ ] Define local queue persistence, playback continuity, and deterministic regression coverage
+- [x] Define local queue persistence, playback continuity, and deterministic regression coverage
+- [x] Implement and validate the versioned local Library/Queue foundation with safe v1 migration
 - [ ] Improve transition timing using stored per-track analysis and user feedback controls
 - [ ] Expand device-level regression testing for import, playback, and update flows
 - [ ] Bundle the next verified feature set into one Android release and collect test feedback

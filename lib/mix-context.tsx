@@ -34,6 +34,15 @@ import {
   serializeMixSettings,
   SETTINGS_STORAGE_KEY,
 } from "@/lib/mix-settings";
+import {
+  addToQueue,
+  hydrateLibraryState,
+  LIBRARY_STATE_STORAGE_KEY,
+  queueTracks as tracksForQueue,
+  reconcileQueueCurrentId,
+  removeFromQueue,
+  sanitizeQueueIds,
+} from "@/lib/local-library-state";
 
 type ManagedPlayer = ReturnType<typeof createAudioPlayer>;
 type PlayerSubscription = { remove: () => void };
@@ -46,6 +55,7 @@ export type LocalTrack = {
   fileName: string;
   mimeType?: string;
   bytes?: number;
+  addedAt: number;
   profile: TrackProfile;
 };
 
@@ -58,6 +68,9 @@ type PlaybackSnapshot = {
 
 type MixContextValue = {
   library: LocalTrack[];
+  queueIds: string[];
+  queueTracks: LocalTrack[];
+  queueCurrentId?: string;
   currentTrack?: LocalTrack;
   nextTrack?: LocalTrack;
   currentIndex: number;
@@ -80,7 +93,7 @@ type MixContextValue = {
   clearLibrary: () => Promise<void>;
 };
 
-const STORAGE_KEY = "automix.library.v1";
+const LEGACY_LIBRARY_STORAGE_KEY = "automix.library.v1";
 
 const MixContext = createContext<MixContextValue | null>(null);
 
@@ -99,6 +112,8 @@ function isManagedLibraryUri(uri: string) {
 
 export function MixProvider({ children }: { children: React.ReactNode }) {
   const [library, setLibrary] = useState<LocalTrack[]>([]);
+  const [queueIds, setQueueIds] = useState<string[]>([]);
+  const [queueCurrentId, setQueueCurrentId] = useState<string>();
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [settings, setSettings] = useState<MixSettings>(DEFAULT_MIX_SETTINGS);
   const [playback, setPlayback] = useState<PlaybackSnapshot>({
@@ -143,15 +158,27 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
     const hydrate = async () => {
       try {
-        const [storedLibrary, storedSettings] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY),
+        const [storedLibraryState, storedLegacyLibrary, storedSettings] = await Promise.all([
+          AsyncStorage.getItem(LIBRARY_STATE_STORAGE_KEY),
+          AsyncStorage.getItem(LEGACY_LIBRARY_STORAGE_KEY),
           AsyncStorage.getItem(SETTINGS_STORAGE_KEY),
         ]);
         if (!mounted) return;
-        if (storedLibrary) {
-          const restoredLibrary = JSON.parse(storedLibrary) as LocalTrack[];
+        const restoredState =
+          hydrateLibraryState<LocalTrack>(storedLibraryState) ??
+          hydrateLibraryState<LocalTrack>(storedLegacyLibrary);
+        if (restoredState) {
+          const restoredLibrary = restoredState.state.tracks;
+          const restoredCurrentId = restoredState.state.queueCurrentId;
+          const restoredIndex = restoredCurrentId
+            ? restoredLibrary.findIndex((track) => track.id === restoredCurrentId)
+            : restoredLibrary.length > 0
+              ? 0
+              : -1;
           setLibrary(restoredLibrary);
-          if (restoredLibrary.length > 0) setCurrentIndex(0);
+          setQueueIds(restoredState.state.queueIds);
+          setQueueCurrentId(restoredCurrentId);
+          setCurrentIndex(restoredIndex);
         }
         setSettings(parseMixSettings(storedSettings));
       } catch {
@@ -167,8 +194,28 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (isReady) void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(library));
-  }, [isReady, library]);
+    if (!isReady) return;
+
+    const trackIds = library.map((track) => track.id);
+    const persistedQueueIds = sanitizeQueueIds(trackIds, queueIds);
+    const persistedCurrentId = reconcileQueueCurrentId(
+      persistedQueueIds,
+      queueCurrentId,
+    );
+    const state = {
+      schemaVersion: 2 as const,
+      tracks: library,
+      queueIds: persistedQueueIds,
+      ...(persistedCurrentId ? { queueCurrentId: persistedCurrentId } : {}),
+    };
+
+    void AsyncStorage.setItem(
+      LIBRARY_STATE_STORAGE_KEY,
+      JSON.stringify(state),
+    ).catch(() => {
+      setIssue("Your Library and queue changes could not be saved. Keep AutoMix open and try again.");
+    });
+  }, [isReady, library, queueCurrentId, queueIds]);
 
   useEffect(() => {
     if (isReady) void AsyncStorage.setItem(SETTINGS_STORAGE_KEY, serializeMixSettings(settings));
@@ -241,6 +288,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
       releasePlayer();
       const player = createPlayerFor(nextTrack);
       currentPlayerRef.current = player;
+      setQueueCurrentId(nextTrack.id);
       setCurrentIndex(index);
       setPlayback({ playing: false, position: 0, duration: 0, isMixing: false });
       if (autoplay) {
@@ -298,6 +346,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
           currentPlayerRef.current = preparedIncomingPlayer;
           transitionPlayerRef.current = null;
           mixingRef.current = false;
+          setQueueCurrentId(incoming.id);
           setCurrentIndex(followingIndex);
           setPlayback({
             playing: true,
@@ -431,6 +480,7 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
             fileName: asset.name,
             mimeType: asset.mimeType ?? undefined,
             bytes: asset.size ?? undefined,
+            addedAt: importStartedAt + index,
             profile: {},
           });
         } catch {
@@ -446,6 +496,9 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
 
       if (libraryRef.current.length === 0 && imported.length > 0) setCurrentIndex(0);
       setLibrary((existing) => [...existing, ...imported]);
+      setQueueIds((existing) =>
+        imported.reduce((queue, track) => addToQueue(queue, track.id), existing),
+      );
       setNotice(`${imported.length} ${imported.length === 1 ? "track was" : "tracks were"} added to your local library.${failedImports > 0 ? ` ${failedImports} could not be copied.` : ""}`);
       haptic.confirm();
     } catch {
@@ -527,6 +580,10 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     const next = current.filter((track) => track.id !== id);
     libraryRef.current = next;
     setLibrary(next);
+    setQueueIds((existing) => removeFromQueue(existing, id));
+    setQueueCurrentId((currentId) =>
+      currentId === id ? undefined : currentId,
+    );
     if (index === currentIndexRef.current) {
       releasePlayer();
       currentIndexRef.current = -1;
@@ -548,6 +605,8 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     libraryRef.current = [];
     currentIndexRef.current = -1;
     setLibrary([]);
+    setQueueIds([]);
+    setQueueCurrentId(undefined);
     setCurrentIndex(-1);
     setPlayback({ playing: false, position: 0, duration: 0, isMixing: false });
     const results = await Promise.all(tracks.map(deleteManagedTrackFile));
@@ -557,6 +616,10 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
   }, [deleteManagedTrackFile, releasePlayer]);
 
   const currentTrack = currentIndex >= 0 ? library[currentIndex] : undefined;
+  const queueTracks = useMemo(
+    () => tracksForQueue(library, queueIds),
+    [library, queueIds],
+  );
   const nextIndex = nextIndexFor(currentIndex, library);
   const nextTrack = nextIndex >= 0 ? library[nextIndex] : undefined;
   const activePlan = useMemo(
@@ -566,6 +629,9 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<MixContextValue>(() => ({
     library,
+    queueIds,
+    queueTracks,
+    queueCurrentId,
     currentTrack,
     nextTrack,
     currentIndex,
@@ -603,6 +669,9 @@ export function MixProvider({ children }: { children: React.ReactNode }) {
     playNext,
     playPrevious,
     playTrack,
+    queueCurrentId,
+    queueIds,
+    queueTracks,
     removeTrack,
     seekTo,
     settings,
