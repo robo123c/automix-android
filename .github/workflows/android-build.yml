@@ -127,6 +127,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Allocate a new Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker_message="$(git for-each-ref --format='%(contents)' refs/tags/android-nightly-latest)"
+          previous_version_code="$(printf '%s\n' "${marker_message}" | sed -n 's/^Android version code: \([0-9][0-9]*\)$/\1/p' | tail -n 1)"
+
+          if [[ -z "${previous_version_code}" ]]; then
+            previous_version_code=4
+          fi
+
+          release_version_code="$((previous_version_code + 1))"
+          echo "AUTOMIX_ANDROID_VERSION_CODE=${release_version_code}" >> "$GITHUB_ENV"
+          echo "Allocating Android version code ${release_version_code} after ${previous_version_code}."
+
       - name: Generate Android project
         run: npx expo prebuild --platform android --non-interactive --no-install
 
@@ -153,23 +168,43 @@ jobs:
           release_tag="android-nightly-${release_date}-${GITHUB_SHA::7}"
           release_title="AutoMix nightly — ${release_date}"
           apk_path="android/app/build/outputs/apk/release/app-release.apk"
+          update_manifest="automix-update.json"
+          version="$(npx expo config --type public --json | jq -r '.version')"
+          version_code="$(npx expo config --type public --json | jq -r '.android.versionCode')"
+          apk_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${release_tag}/AutoMix-android-release.apk"
 
-          gh release create "${release_tag}" "${apk_path}#AutoMix-android-release.apk" \
+          if [[ "${version_code}" != "${AUTOMIX_ANDROID_VERSION_CODE}" ]]; then
+            echo "Expo config version code (${version_code}) does not match the allocated release version code (${AUTOMIX_ANDROID_VERSION_CODE})." >&2
+            exit 1
+          fi
+
+          jq -n \
+            --arg version "${version}" \
+            --argjson versionCode "${version_code}" \
+            --arg apkUrl "${apk_url}" \
+            --arg notes "Nightly AutoMix build from ${GITHUB_SHA::7}." \
+            '{version: $version, versionCode: $versionCode, apkUrl: $apkUrl, notes: $notes}' > "${update_manifest}"
+
+          gh release create "${release_tag}" "${apk_path}#AutoMix-android-release.apk" "${update_manifest}#automix-update.json" \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "${release_title}" \
-            --notes "Nightly standalone Android release built from ${GITHUB_SHA}."
+            --notes "Nightly standalone Android release built from ${GITHUB_SHA} (Android version code ${version_code})."
 
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${version_code}" >> "$GITHUB_OUTPUT"
 
       - name: Record successful nightly release baseline
         env:
           RELEASE_TAG: ${{ steps.publish.outputs.release_tag }}
+          RELEASE_VERSION_CODE: ${{ steps.publish.outputs.version_code }}
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag --force --annotate android-nightly-latest "${GITHUB_SHA}" \
-            --message "Latest successful nightly release: ${RELEASE_TAG}"
+            --message "Latest successful nightly release: ${RELEASE_TAG}
+
+          Android version code: ${RELEASE_VERSION_CODE}"
           git push origin "refs/tags/android-nightly-latest" --force

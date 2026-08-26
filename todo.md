@@ -39,3 +39,6 @@
 - [x] Add component-level native render tests for visible import controls
 - [x] Restore the production AutoMix Android package identity and release versioning
 - [x] Show clear import-progress feedback while local tracks are copied
+- [x] Add an in-app Android update checker and user-confirmed installer handoff
+- [x] Make the AutoMix repository public and publish credential-free APK update metadata
+- [x] Generate a strictly increasing Android version code for every released APK

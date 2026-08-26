@@ -2,6 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { FlatList, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { AppUpdateCard } from "@/components/app-update-card";
 import { ImportMusicButton } from "@/components/import-music-button";
 import { importProgressLabel } from "@/lib/import-progress";
 import { useMix, type LocalTrack } from "@/lib/mix-context";
@@ -26,6 +27,7 @@ export default function LibraryScreen() {
         <View><Text style={styles.durationTitle}>Maximum blend</Text><Text style={styles.durationCopy}>AutoMix fades only as long as the song pair needs.</Text></View>
         <View style={styles.durationControls}><Pressable onPress={() => updateSettings({ transitionSeconds: Math.max(1.5, settings.transitionSeconds - 0.5) })} style={({ pressed }) => [styles.stepper, pressed && styles.pressed]}><MaterialIcons name="remove" color="#F6F7F2" size={18} /></Pressable><Text style={styles.durationValue}>{settings.transitionSeconds.toFixed(1)}s</Text><Pressable onPress={() => updateSettings({ transitionSeconds: Math.min(8, settings.transitionSeconds + 0.5) })} style={({ pressed }) => [styles.stepper, pressed && styles.pressed]}><MaterialIcons name="add" color="#F6F7F2" size={18} /></Pressable></View>
       </View>
+      <AppUpdateCard />
       <Text style={styles.sectionLabel}>IMPORTED TRACKS</Text>
       <FlatList
         data={library}

@@ -25,6 +25,17 @@ const bundleId =
 // e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
+const configuredAndroidVersionCode = Number.parseInt(
+  process.env.AUTOMIX_ANDROID_VERSION_CODE ?? "4",
+  10,
+);
+
+if (
+  !Number.isSafeInteger(configuredAndroidVersionCode) ||
+  configuredAndroidVersionCode < 1
+) {
+  throw new Error("AUTOMIX_ANDROID_VERSION_CODE must be a positive integer.");
+}
 
 const env = {
   // App branding - update these values directly (do not use env vars)
@@ -50,12 +61,12 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
-    "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
-    versionCode: 4,
+    versionCode: configuredAndroidVersionCode,
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
       foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -94,7 +105,8 @@ const config: ExpoConfig = {
     [
       "expo-audio",
       {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
+        microphonePermission:
+          "Allow $(PRODUCT_NAME) to access your microphone.",
       },
     ],
     [
